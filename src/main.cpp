@@ -175,7 +175,7 @@ int main(int argc, char** argv){
 
     // RRT
     generate_path_RRT(waypoints[0], waypoints[1]);
-    printf("Generate RRT\n");
+    printf("Generate RRT!\n");
 
     // FSM
     state = INIT;
