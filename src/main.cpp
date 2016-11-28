@@ -1,27 +1,29 @@
 // Debug Option
 // #define DEBUG_TEXT
-// #define DEBUG_POINT_CLOUD
+//#define DEBUG_POINT_CLOUD
 // #define DEBUG_BALL
 
 #define VISUALIZE_PATH false
 
 #define CONST_K 50000
 #define MAX_STEP 0.25
-#define MARGIN 10
+#define MARGIN 13
 #define LOOK_AHEAD_DISTANCE 0.5
-#define GOAL_CONFIRM_DISTANCE 0.5
+#define GOAL_CONFIRM_DISTANCE 0.2
 
 // Dynamic mapping
-#define OBSTACLE_DETERMINENT_DISTANCE 3
+#define OBSTACLE_DETERMINENT_DISTANCE 2.5
 #define CAMERA_SAMPLING_RATE 3 // # of pixels skipped between each pixel observed
 #define COLLISION_CHECK_RATE 3 // # of iterations passed before next collision check
 #define HORIZON 274 // HORIZON <= "Ground" <= 480
 #define CHECK_Z_ABOVE_HORIZON 45
 #define GROUND_HEIGHT 0.309900 // Kinect y axis
-#define NEW_OBSTACLE_MARGIN 10 // map update margin
+#define NEW_OBSTACLE_MARGIN 13 // map update margin
 #define OBSTACLE_HEIGHT 0.35
 #define SLEEP_PLANNING 3
 #define WIGGLING_THRESHOLD 50
+#define KINECT_MARGIN_W 10
+#define KINECT_VIEWAREA_X 0.7
 
 // State definition
 #define INIT 0
@@ -117,7 +119,7 @@ cv::Mat addMargin(cv::Mat map, int margin);
         std::string("<visual>") +
         std::string("<origin xyz=\"0 0 0\" rpy=\"0 0 0\" />") +
         std::string("<geometry>") +
-        std::string("<sphere radius=\"0.09\"/>") +
+        std::string("<sphere radius=\"0.03\"/>") +
         std::string("</geometry>") +
         std::string("</visual>") +
         std::string("<collision>") +
@@ -255,7 +257,6 @@ int main(int argc, char** argv){
                         // cmd_vel_pub.publish(cmd_vel);
                         // ros::spinOnce();
                         // ros::Rate(1).sleep();
-
                         if (isCollision()) {
                             state = PATH_PLANNING;
                             break;
@@ -398,29 +399,31 @@ bool isCollision() {
     bool isObstacle = false;
     bool isNewObstacle = false;
     std::vector<point> obstacle;
+    pcl::PointCloud<pcl::PointXYZ> point_cloud_cpy;
     point poseOfRobot = robot_pose;
+
 
     // detection method 1: check straight line above ground
     GridMapPoint gp = GridMapPoint(poseOfRobot, res, map_origin_x, map_origin_y);
     if (dynamic_map.at<uchar>(gp.i,gp.j) == 0) {
         return false;
     }
-
-    for (int i = 0; i < point_cloud.width; i += CAMERA_SAMPLING_RATE) {
-        pcl::PointXYZ checkpoint = point_cloud.at(i, HORIZON - CHECK_Z_ABOVE_HORIZON);
-        // check NaN value: NaN float f has property of "f != f == true" (IEEE)
+    for (int i = KINECT_MARGIN_W; i < point_cloud_cpy.width - KINECT_MARGIN_W; i += CAMERA_SAMPLING_RATE) {
+        pcl::PointXYZ checkpoint = point_cloud_cpy.at(i, HORIZON - CHECK_Z_ABOVE_HORIZON);
+    // check NaN value: NaN float f has property of "f != f == true" (IEEE)
         if (!(checkpoint.z != checkpoint.z) && getActualZ(checkpoint) > OBSTACLE_HEIGHT) {
-            pcl::PointXYZ checkpointLeft = point_cloud.at(i - 1, HORIZON - CHECK_Z_ABOVE_HORIZON);
-            pcl::PointXYZ checkpointRight = point_cloud.at(i + 1, HORIZON - CHECK_Z_ABOVE_HORIZON);
+            pcl::PointXYZ checkpointLeft = point_cloud_cpy.at(i - 1, HORIZON - CHECK_Z_ABOVE_HORIZON);
+            pcl::PointXYZ checkpointRight = point_cloud_cpy.at(i + 1, HORIZON - CHECK_Z_ABOVE_HORIZON);
             if ((!(checkpointLeft.z != checkpointLeft.z) && getActualZ(checkpointLeft) > OBSTACLE_HEIGHT) ||
                 (!(checkpointRight.z != checkpointRight.z) && getActualZ(checkpointRight) > OBSTACLE_HEIGHT)) {
-                if (checkpoint.z < OBSTACLE_DETERMINENT_DISTANCE) {
+                if (checkpoint.z < OBSTACLE_DETERMINENT_DISTANCE && abs(checkpoint.x) < KINECT_VIEWAREA_X) {
                     obstacle.push_back(transformFrameKinect2World(checkpoint, poseOfRobot));
                     isObstacle = true;
                 }
             }
         }
     } 
+    
     if (obstacle.size() > WIGGLING_THRESHOLD) {
         obstacle.clear();
         return false;
@@ -450,7 +453,6 @@ bool isCollision() {
         }
     }
     obstacle.clear();
-    std::cout << "# of obstacle point : " << newObstacle << std::endl;
     return isNewObstacle;
 }
 
@@ -531,7 +533,3 @@ cv::Mat addMargin(cv::Mat map, int margin) {
 
     return map_margin;
 }
-
-// cv::Mat addNewMargin(cv::Mat map, GridMapPoint obstacle, int newMargin, ) {
-
-// }

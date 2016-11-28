@@ -1,7 +1,7 @@
 // #define DEBUG_VISUALIZE_TREE
 #define DEBUG_IMAGE_FILE
 
-#define ETA 2.0
+#define ETA 1.5
 #define GAMMA_MULTIPLIER 1
 #define GAMMA 14        
 #define SAMPLE_RATE 1
